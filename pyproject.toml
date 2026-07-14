@@ -1,0 +1,15 @@
+[project]
+name = "msys-sdk"
+version = "0.1.7"
+description = "MSYS SDK"
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+msys-mipc-stdio = "msys_sdk.stdio_bridge:main"
+msys-i18n-c = "msys_sdk.i18n_c:main"
+msys-app-manifest = "msys_sdk.app_manifest:main"
