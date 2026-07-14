@@ -46,8 +46,12 @@ from .ui_identity import (
     configure_tk_window_identity,
     window_identity,
 )
+from .ui_input_method import (
+    TkInputMethodBinding,
+    bind_tk_input_method,
+)
 
-__version__ = "0.1.9"
+__version__ = "0.1.10"
 
 __all__ = [
     "MsysClient",
@@ -87,4 +91,6 @@ __all__ = [
     "WindowIdentity",
     "configure_tk_window_identity",
     "window_identity",
+    "TkInputMethodBinding",
+    "bind_tk_input_method",
 ]

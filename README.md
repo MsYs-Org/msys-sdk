@@ -249,6 +249,41 @@ small policy for Qt widgets. `content_width()` and `responsive_columns()` are
 toolkit-neutral for custom/native layouts. There is no global input binding or
 UI daemon; scrolling stays owned by the page.
 
+### Optional Tk input-method lifecycle
+
+Tk applications with editable fields can opt into the replaceable
+`role:input-method` without naming the stock touch keyboard:
+
+```python
+from msys_sdk import TkInputMethodBinding
+
+# Construct this after the private MsysClient is ready. client.call is the
+# already-authorized component call method, not a D-Bus or toolkit service.
+input_method = TkInputMethodBinding(root, client.call)
+input_method.bind(editor, mode="zh")
+
+# Explicit Save/submit actions may dismiss it without closing the editor.
+input_method.hide()
+
+def close_window():
+    input_method.close()  # ordered best-effort hide, then unbind
+    root.destroy()
+```
+
+The component manifest needs only the normal application state permissions
+plus `mipc.call:role:input-method`. Focus, a real editor touch, focus loss,
+outside touch, and widget destruction are coalesced on a small worker. The
+default cold-show deadline is six seconds and FocusOut settles for 80 ms, so
+on-demand Tk startup and transient focus movement do not become false failures
+or duplicate calls. Call `sync_focus()` after delayed client readiness if the
+editor was focused first. `bind_tk_input_method()` is the one-editor
+convenience form.
+
+This helper imports no Tk module and is entirely optional. Qt, Electron,
+C/C++, and other applications continue to call `role:input-method` directly
+or use their own toolkit binding; the SDK does not force a Tk lifecycle on
+them.
+
 Calls use the same API for replaceable roles, application interfaces, and
 exact components:
 
