@@ -12,12 +12,20 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import os
+import threading
 from dataclasses import dataclass
 from typing import Any, Mapping
 
 
 MAX_IDENTITY_BYTES = 192
 _APPLIED_ATTRIBUTE = "_msys_window_identity_applied"
+_X11_ERROR_HANDLER_LOCK = threading.Lock()
+
+
+# Xlib's error handler is process-global.  Keep the callback signature small:
+# the event contents are not needed because every error makes this optional
+# identity write fail in the same way.
+_XErrorHandler = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
 
 
 def _clean(value: object, fallback: str) -> str:
@@ -94,8 +102,23 @@ def _load_x11() -> Any:
     library.XChangeProperty.restype = ctypes.c_int
     library.XSetClassHint.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.POINTER(_XClassHint)]
     library.XSetClassHint.restype = ctypes.c_int
+    library.XQueryTree.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_ulong)),
+        ctypes.POINTER(ctypes.c_uint),
+    ]
+    library.XQueryTree.restype = ctypes.c_int
+    library.XFree.argtypes = [ctypes.c_void_p]
+    library.XFree.restype = ctypes.c_int
     library.XFlush.argtypes = [ctypes.c_void_p]
     library.XFlush.restype = ctypes.c_int
+    library.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    library.XSync.restype = ctypes.c_int
+    library.XSetErrorHandler.argtypes = [ctypes.c_void_p]
+    library.XSetErrorHandler.restype = ctypes.c_void_p
     return library
 
 
@@ -111,32 +134,79 @@ def _write_x11_identity(
         if not display:
             return False
         try:
-            instance = identity.wm_instance.encode("utf-8")
-            wm_class = identity.wm_class.encode("utf-8")
-            hint = _XClassHint(instance, wm_class)
-            x11.XSetClassHint(display, int(window_id), ctypes.byref(hint))
+            had_x11_error = False
+            wrote_identity = False
 
-            utf8 = x11.XInternAtom(display, b"UTF8_STRING", 0)
-            for property_name, value in (
-                (b"_MSYS_APP_ID", identity.app_id),
-                (b"_MSYS_COMPONENT_ID", identity.component_id),
-                (b"_MSYS_WINDOW_ROLE", identity.role),
-            ):
-                atom = x11.XInternAtom(display, property_name, 0)
-                encoded = value.encode("utf-8")
-                buffer = (ctypes.c_ubyte * len(encoded)).from_buffer_copy(encoded)
-                x11.XChangeProperty(
-                    display,
-                    int(window_id),
-                    atom,
-                    utf8,
-                    8,
-                    0,  # PropModeReplace
-                    buffer,
-                    len(encoded),
-                )
-            x11.XFlush(display)
-            return True
+            @_XErrorHandler
+            def ignore_optional_identity_error(_display: Any, _event: Any) -> int:
+                nonlocal had_x11_error
+                had_x11_error = True
+                return 0
+
+            # BadWindow is asynchronous.  Without a temporary handler it is
+            # reported by XFlush/XCloseDisplay through Xlib's default handler,
+            # which terminates the whole GUI process.  XSync guarantees the
+            # request and any error have completed before restoring the
+            # process-global handler.  The lock also prevents two SDK writers
+            # from replacing one another's handler.
+            with _X11_ERROR_HANDLER_LOCK:
+                handler = ctypes.cast(ignore_optional_identity_error, ctypes.c_void_p)
+                previous_handler = x11.XSetErrorHandler(handler)
+                try:
+                    # On X11 ``winfo_id()`` is Tk's content window.  The WM
+                    # properties live on its direct parent, a stable wrapper
+                    # which Tk creates even when no external WM is running.
+                    # Writing the content XID succeeds but leaves Tk's
+                    # capitalized WM_CLASS on the actual managed window.
+                    root = ctypes.c_ulong()
+                    wrapper = ctypes.c_ulong()
+                    children = ctypes.POINTER(ctypes.c_ulong)()
+                    child_count = ctypes.c_uint()
+                    queried = x11.XQueryTree(
+                        display,
+                        int(window_id),
+                        ctypes.byref(root),
+                        ctypes.byref(wrapper),
+                        ctypes.byref(children),
+                        ctypes.byref(child_count),
+                    )
+                    if children:
+                        x11.XFree(children)
+                    target = int(wrapper.value)
+                    if queried and target > 0 and target != int(root.value):
+                        instance = identity.wm_instance.encode("utf-8")
+                        wm_class = identity.wm_class.encode("utf-8")
+                        hint = _XClassHint(instance, wm_class)
+                        x11.XSetClassHint(display, target, ctypes.byref(hint))
+
+                        utf8 = x11.XInternAtom(display, b"UTF8_STRING", 0)
+                        for property_name, value in (
+                            (b"_MSYS_APP_ID", identity.app_id),
+                            (b"_MSYS_COMPONENT_ID", identity.component_id),
+                            (b"_MSYS_WINDOW_ROLE", identity.role),
+                        ):
+                            atom = x11.XInternAtom(display, property_name, 0)
+                            encoded = value.encode("utf-8")
+                            buffer = (ctypes.c_ubyte * len(encoded)).from_buffer_copy(encoded)
+                            x11.XChangeProperty(
+                                display,
+                                target,
+                                atom,
+                                utf8,
+                                8,
+                                0,  # PropModeReplace
+                                buffer,
+                                len(encoded),
+                            )
+                        x11.XFlush(display)
+                        wrote_identity = True
+                finally:
+                    # Drain the helper connection while the non-fatal handler
+                    # is still installed, including when a local conversion
+                    # error interrupted the property loop.
+                    x11.XSync(display, 0)
+                    x11.XSetErrorHandler(previous_handler)
+            return wrote_identity and not had_x11_error
         finally:
             x11.XCloseDisplay(display)
     except (AttributeError, OSError, TypeError, ValueError):
@@ -164,15 +234,27 @@ def configure_tk_window_identity(
         default_instance=default_instance,
         environ=environ,
     )
+    if getattr(window, _APPLIED_ATTRIBUTE, None) == identity:
+        return identity
     try:
         # ``winfo_id`` materializes the native window without forcing an
         # otherwise not-yet-started root through an event-loop/map cycle.
         # This lets the corrected WM_CLASS exist before the first MapRequest.
         window_id = int(window.winfo_id())
+        if window_id <= 0:
+            return identity
+        # Tk and this helper use separate X11 connections.  Flush Tk's
+        # XCreateWindow before XChangeProperty is sent through the helper's
+        # connection, otherwise the server can legitimately report BadWindow.
+        update_idletasks = getattr(window, "update_idletasks", None)
+        if callable(update_idletasks):
+            update_idletasks()
         display_name = str(window.winfo_screen() or "")
     except (AttributeError, RuntimeError, TypeError, ValueError):
         return identity
-    _write_x11_identity(window_id, display_name, identity)
+    applied = _write_x11_identity(window_id, display_name, identity)
+    if not applied:
+        return identity
     try:
         setattr(window, _APPLIED_ATTRIBUTE, identity)
     except (AttributeError, RuntimeError):

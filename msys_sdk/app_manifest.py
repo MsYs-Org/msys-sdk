@@ -191,6 +191,8 @@ def create_application_manifest(
         _validate_identifier(capability, "capability", CAPABILITY_RE)
     for permission in permission_values:
         _validate_identifier(permission, "permission", PERMISSION_RE)
+        if len(permission) > 256:
+            raise AppManifestError("permission must contain at most 256 characters")
 
     # A capability-only declaration is still a discoverable provider. Treat
     # every ``provides`` kind consistently so it is supervised and ready
@@ -215,6 +217,8 @@ def create_application_manifest(
     argument_values = _strings(exec_args, "exec argument")
     for argument in argument_values:
         command.append(_validate_text(argument, "exec argument", 4096))
+    if len(command) > 256:
+        raise AppManifestError("exec must contain at most 256 arguments")
     selected_timeout = default_timeout if timeout_ms is None else timeout_ms
     if not isinstance(selected_timeout, int) or isinstance(selected_timeout, bool):
         raise AppManifestError("timeout must be an integer")
@@ -224,7 +228,14 @@ def create_application_manifest(
     if graphical:
         if window_mode not in WINDOW_MODES:
             raise AppManifestError(f"unsupported window mode: {window_mode!r}")
-        if display != "inherit" and re.fullmatch(r":[0-9]+(?:\.[0-9]+)?", display) is None:
+        if (
+            not isinstance(display, str)
+            or len(display) > 128
+            or (
+                display != "inherit"
+                and re.fullmatch(r":[0-9]+(?:\.[0-9]+)?", display) is None
+            )
+        ):
             raise AppManifestError("display must be 'inherit' or an X11 display such as :24")
         if "display:x11" not in permission_values:
             permission_values.append("display:x11")

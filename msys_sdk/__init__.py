@@ -47,7 +47,7 @@ from .ui_identity import (
     window_identity,
 )
 
-__version__ = "0.1.7"
+__version__ = "0.1.9"
 
 __all__ = [
     "MsysClient",

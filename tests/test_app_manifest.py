@@ -208,7 +208,10 @@ class AppManifestTests(unittest.TestCase):
             ({"package_id": "org.example.bad", "runtime": "python", "timeout_ms": True}, "timeout"),
             ({"package_id": "org.example.bad", "runtime": "python", "timeout_ms": 0}, "timeout"),
             ({"package_id": "org.example.bad", "runtime": "python", "display": "24"}, "display"),
+            ({"package_id": "org.example.bad", "runtime": "python", "display": ":" + "1" * 128}, "display"),
             ({"package_id": "org.example.bad", "runtime": "python", "window_mode": "desktop"}, "window mode"),
+            ({"package_id": "org.example.bad", "runtime": "python", "permissions": ["p" * 257]}, "permission"),
+            ({"package_id": "org.example.bad", "runtime": "python", "exec_args": ["x"] * 255}, "256 arguments"),
         )
         for arguments, message in cases:
             with self.subTest(arguments=arguments):
