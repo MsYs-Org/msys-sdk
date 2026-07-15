@@ -346,3 +346,32 @@ entry point or `python3 -m msys_sdk.stdio_bridge -- command`.
 dependency-free Node implementation of handshake, subscription, shutdown, and
 an inbound `ping` RPC. The exact same stream code can run in Electron's main
 process while its renderer remains an ordinary UI implementation detail.
+
+### Application-local Back handling
+
+Applications with internal pages declare
+`org.msys.application-navigation.v1` and serve `navigation_back` on their
+private component channel. The public Python helper keeps the reply contract
+identical across Tk, Qt bindings, and other Python UI frameworks:
+
+```python
+from msys_sdk import ComponentChannel, application_navigation_handler
+
+channel = ComponentChannel.from_environment()
+if channel is not None:
+    channel.handshake()
+    channel.start(
+        on_component_message,
+        call_handler=application_navigation_handler(navigate_back),
+    )
+```
+
+`navigate_back()` returns `True` only after consuming Back inside the app. At
+the root page it returns `False`, allowing the window manager to restore the
+previous application or Home. Toolkit state must still be marshalled to its UI
+thread; this helper does not impose a framework event loop.
+
+Native C and C++ use `MSYS_APPLICATION_NAVIGATION_INTERFACE`,
+`MSYS_NAVIGATION_BACK_METHOD`, and
+`msys_mipc_send_navigation_back_result()`. These constants and the reply
+helper are also directly usable by Qt/C++ without a framework adapter.

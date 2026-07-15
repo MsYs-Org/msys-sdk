@@ -51,16 +51,24 @@ from .ui_input_method import (
     bind_tk_input_method,
 )
 from .component_ipc import (
+    ComponentCallHandler,
+    ComponentCallback,
     ComponentChannel,
     MipcError,
     MipcRemoteError,
     MipcUnavailable,
     PublicMipcClient,
 )
+from .application_navigation import (
+    APPLICATION_NAVIGATION_INTERFACE,
+    NAVIGATION_BACK_METHOD,
+    NavigationBackCallback,
+    application_navigation_handler,
+)
 from .tk_app import ResponsiveCardGrid, TouchApplication
 from .package_i18n import PackageI18n
 
-__version__ = "0.1.11"
+__version__ = "0.1.12"
 
 __all__ = [
     "MsysClient",
@@ -103,10 +111,16 @@ __all__ = [
     "TkInputMethodBinding",
     "bind_tk_input_method",
     "ComponentChannel",
+    "ComponentCallback",
+    "ComponentCallHandler",
     "MipcError",
     "MipcRemoteError",
     "MipcUnavailable",
     "PublicMipcClient",
+    "APPLICATION_NAVIGATION_INTERFACE",
+    "NAVIGATION_BACK_METHOD",
+    "NavigationBackCallback",
+    "application_navigation_handler",
     "ResponsiveCardGrid",
     "TouchApplication",
     "PackageI18n",

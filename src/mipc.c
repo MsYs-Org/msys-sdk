@@ -543,6 +543,19 @@ int msys_mipc_send_return_json(
     );
 }
 
+int msys_mipc_send_navigation_back_result(
+    msys_mipc_client *client,
+    uint64_t request_id,
+    int handled
+)
+{
+    return msys_mipc_send_return_json(
+        client,
+        request_id,
+        handled != 0 ? "{\"handled\":true}" : "{\"handled\":false}"
+    );
+}
+
 int msys_mipc_send_error(
     msys_mipc_client *client,
     uint64_t request_id,

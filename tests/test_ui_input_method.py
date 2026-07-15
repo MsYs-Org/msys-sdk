@@ -103,7 +103,7 @@ class TkInputMethodBindingTests(unittest.TestCase):
     def test_public_api_version_is_consistent(self) -> None:
         project = Path(__file__).resolve().parents[1] / "pyproject.toml"
         text = project.read_text(encoding="utf-8")
-        self.assertEqual(__version__, "0.1.11")
+        self.assertEqual(__version__, "0.1.12")
         self.assertEqual(
             re.search(r'(?m)^version\s*=\s*"([^"]+)"', text).group(1),
             __version__,

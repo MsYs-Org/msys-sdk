@@ -12,6 +12,7 @@ from msys_sdk.component_ipc import (
     MipcRemoteError,
     PublicMipcClient,
 )
+from msys_sdk.application_navigation import application_navigation_handler
 
 
 class PublicMipcClientTests(unittest.TestCase):
@@ -164,6 +165,38 @@ class ComponentChannelTests(unittest.TestCase):
         thread.join(timeout=1)
         self.assertEqual(caught.exception.code, "ACCESS_DENIED")
         self.assertEqual(caught.exception.payload["permission"], "mipc.call:msys.core")
+
+    def test_inbound_application_navigation_call_is_replied_by_handler(self) -> None:
+        app_socket, daemon_socket = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        channel = ComponentChannel(app_socket, "org.example.app:main", 2)
+        unhandled: list[dict] = []
+        back_calls: list[str] = []
+        channel.start(
+            unhandled.append,
+            call_handler=application_navigation_handler(
+                lambda: back_calls.append("back") is None
+            ),
+        )
+
+        daemon_socket.send(
+            json.dumps(
+                {"type": "call", "id": 41, "method": "navigation_back", "payload": {}}
+            ).encode("utf-8")
+        )
+        reply = json.loads(daemon_socket.recv(65536).decode("utf-8"))
+        channel.close()
+        daemon_socket.close()
+
+        self.assertEqual(reply, {"type": "return", "id": 41, "payload": {"handled": True}})
+        self.assertEqual(back_calls, ["back"])
+        self.assertEqual(unhandled, [])
+
+    def test_application_navigation_declines_unknown_method(self) -> None:
+        handler = application_navigation_handler(lambda: True)
+        self.assertEqual(
+            handler({"type": "call", "method": "not_navigation"}),
+            {"handled": False, "reason": "method-not-supported"},
+        )
 
 
 if __name__ == "__main__":

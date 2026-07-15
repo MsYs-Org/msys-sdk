@@ -89,6 +89,8 @@ def _recv_line(sock: socket.socket, timeout: float) -> dict[str, Any]:
 
 
 Exchange = Callable[[Path, dict[str, Any], float], dict[str, Any]]
+ComponentCallback = Callable[[dict[str, Any]], None]
+ComponentCallHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 def _socket_exchange(
@@ -317,13 +319,18 @@ class ComponentChannel:
             raise MipcError("msysd did not accept component hello")
         self.send({"type": "ready"})
 
-    def start(self, callback: Callable[[dict[str, Any]], None]) -> None:
+    def start(
+        self,
+        callback: ComponentCallback,
+        *,
+        call_handler: ComponentCallHandler | None = None,
+    ) -> None:
         with self._pump_lock:
             if self._pump_thread is not None:
                 raise MipcError("Component channel event pump is already running")
             thread = threading.Thread(
                 target=self.pump,
-                args=(callback,),
+                args=(callback, call_handler),
                 name=f"msys-component-mipc:{self.component}",
                 daemon=True,
             )
@@ -340,7 +347,11 @@ class ComponentChannel:
             except queue.Full:
                 pass
 
-    def pump(self, callback: Callable[[dict[str, Any]], None]) -> None:
+    def pump(
+        self,
+        callback: ComponentCallback,
+        call_handler: ComponentCallHandler | None = None,
+    ) -> None:
         while not self.closed.is_set():
             try:
                 message = self.receive(timeout=1.0)
@@ -364,6 +375,26 @@ class ComponentChannel:
                     except queue.Full:
                         pass
                     continue
+            if message.get("type") == "call" and call_handler is not None:
+                if not isinstance(request_id, int) or isinstance(request_id, bool):
+                    continue
+                try:
+                    payload = call_handler(message)
+                    if not isinstance(payload, dict):
+                        raise TypeError("component call handler must return an object")
+                    self.send(
+                        {"type": "return", "id": request_id, "payload": payload}
+                    )
+                except Exception as exc:
+                    self.send(
+                        {
+                            "type": "error",
+                            "id": request_id,
+                            "code": "CALL_FAILED",
+                            "message": str(exc)[:256],
+                        }
+                    )
+                continue
             callback(message)
             if message.get("type") in {"eof", "shutdown"}:
                 self._fail_pending(MipcUnavailable("Component channel closed"))

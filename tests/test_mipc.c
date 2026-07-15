@@ -81,6 +81,21 @@ int main(void)
         sockets[0],
         "{\"type\":\"return\",\"id\":42,\"payload\":{\"ok\":true}}"
     ) == 0);
+    CHECK(strcmp(
+        MSYS_APPLICATION_NAVIGATION_INTERFACE,
+        "org.msys.application-navigation.v1"
+    ) == 0);
+    CHECK(strcmp(MSYS_NAVIGATION_BACK_METHOD, "navigation_back") == 0);
+    CHECK(msys_mipc_send_navigation_back_result(&client, 43u, 1) == MSYS_MIPC_OK);
+    CHECK(receive_exact(
+        sockets[0],
+        "{\"type\":\"return\",\"id\":43,\"payload\":{\"handled\":true}}"
+    ) == 0);
+    CHECK(msys_mipc_send_navigation_back_result(&client, 44u, 0) == MSYS_MIPC_OK);
+    CHECK(receive_exact(
+        sockets[0],
+        "{\"type\":\"return\",\"id\":44,\"payload\":{\"handled\":false}}"
+    ) == 0);
 
     CHECK(send(
         sockets[0],

@@ -18,6 +18,8 @@ extern "C" {
 
 #define MSYS_MIPC_MAX_PACKET (256u * 1024u)
 #define MSYS_MIPC_RECV_CAPACITY (MSYS_MIPC_MAX_PACKET + 1u)
+#define MSYS_APPLICATION_NAVIGATION_INTERFACE "org.msys.application-navigation.v1"
+#define MSYS_NAVIGATION_BACK_METHOD "navigation_back"
 
 enum msys_mipc_result {
     MSYS_MIPC_OK = 0,
@@ -101,6 +103,13 @@ int msys_mipc_send_return_json(
     msys_mipc_client *client,
     uint64_t request_id,
     const char *payload_json
+);
+
+/* Standard payload for org.msys.application-navigation.v1.navigation_back. */
+int msys_mipc_send_navigation_back_result(
+    msys_mipc_client *client,
+    uint64_t request_id,
+    int handled
 );
 
 /* Optional convenience for providers that need to reject an incoming call. */
