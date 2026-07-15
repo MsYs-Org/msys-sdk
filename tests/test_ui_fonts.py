@@ -148,6 +148,26 @@ class UiFontPolicyTests(unittest.TestCase):
         )
         self.assertEqual(font_spec(_Overlay(root), 11), ("fixed", -15))
 
+    def test_explicit_tk_family_skips_slow_x11_family_enumeration(self) -> None:
+        api = _TkFonts()
+        api.families = mock.Mock(side_effect=AssertionError("must not enumerate"))
+        tkinter = SimpleNamespace(TclError=RuntimeError, font=api)
+        root = _Root()
+        with (
+            mock.patch.dict("sys.modules", {"tkinter": tkinter}),
+            mock.patch.dict(
+                os.environ,
+                {"MSYS_UI_FONT_FAMILY": "Noto Sans CJK SC"},
+                clear=True,
+            ),
+        ):
+            configure_tk_fonts(root, default_size=10)
+        api.families.assert_not_called()
+        self.assertTrue(
+            all(font.options == {"family": "Noto Sans CJK SC", "size": -13}
+                for font in api.named.values())
+        )
+
     def test_tk_supervisor_environment_also_applies_canonical_identity(self) -> None:
         api = _TkFonts()
         tkinter = SimpleNamespace(TclError=RuntimeError, font=api)

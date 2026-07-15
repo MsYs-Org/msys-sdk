@@ -94,11 +94,19 @@ def configure_tk_fonts(
     from tkinter import TclError
     from tkinter import font as tkfont
 
-    try:
-        available = tkfont.families(root=root)
-    except (TclError, RuntimeError):
-        available = ()
-    family = select_font_family(available, requested_font_family())
+    requested = requested_font_family()
+    if requested:
+        # The supervised profile names a font whose presence was already
+        # verified by font-doctor.  Enumerating every Xft family here adds an
+        # avoidable X11 round trip to the cold path of each Tk application;
+        # on the small SPI target it can dominate input-method startup.
+        family = requested
+    else:
+        try:
+            available = tkfont.families(root=root)
+        except (TclError, RuntimeError):
+            available = ()
+        family = select_font_family(available)
     if family is None:
         try:
             family = str(

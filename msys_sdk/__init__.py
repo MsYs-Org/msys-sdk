@@ -68,7 +68,7 @@ from .application_navigation import (
 from .tk_app import ResponsiveCardGrid, TouchApplication
 from .package_i18n import PackageI18n
 
-__version__ = "0.1.12"
+__version__ = "0.1.13"
 
 __all__ = [
     "MsysClient",
