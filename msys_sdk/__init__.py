@@ -50,8 +50,17 @@ from .ui_input_method import (
     TkInputMethodBinding,
     bind_tk_input_method,
 )
+from .component_ipc import (
+    ComponentChannel,
+    MipcError,
+    MipcRemoteError,
+    MipcUnavailable,
+    PublicMipcClient,
+)
+from .tk_app import ResponsiveCardGrid, TouchApplication
+from .package_i18n import PackageI18n
 
-__version__ = "0.1.10"
+__version__ = "0.1.11"
 
 __all__ = [
     "MsysClient",
@@ -93,4 +102,12 @@ __all__ = [
     "window_identity",
     "TkInputMethodBinding",
     "bind_tk_input_method",
+    "ComponentChannel",
+    "MipcError",
+    "MipcRemoteError",
+    "MipcUnavailable",
+    "PublicMipcClient",
+    "ResponsiveCardGrid",
+    "TouchApplication",
+    "PackageI18n",
 ]

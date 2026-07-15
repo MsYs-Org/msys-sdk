@@ -1,6 +1,6 @@
 [project]
 name = "msys-sdk"
-version = "0.1.10"
+version = "0.1.11"
 description = "MSYS SDK"
 requires-python = ">=3.10"
 dependencies = []

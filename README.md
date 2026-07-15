@@ -131,6 +131,18 @@ provider contract; provider declarations default to on-demand,
 `--entrypoint` and repeated `--arg` options. The same declaration format
 supports `python`, `tk`, `c`, `cpp`, `qt`, and `electron`.
 
+For small supervised Tk applications, `ComponentChannel` owns the private
+component socket and readiness handshake, `TouchApplication` supplies the
+shared responsive window/input lifecycle, and `PackageI18n` loads an
+application-owned catalog with recovery strings:
+
+```python
+from msys_sdk import ComponentChannel, PackageI18n, TouchApplication
+```
+
+These are framework contracts, not an application registry. Every application
+keeps its own package id, manifest, catalog, state and release lifecycle.
+
 The Python implementation owns exactly one background reader per component
 descriptor. `recv()` and `run()` consume an in-memory unsolicited-message
 queue; they never call socket `recv()` themselves. Reply records are routed by
